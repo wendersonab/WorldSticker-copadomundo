@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Frown, RefreshCw } from 'lucide-react';
+import { Plus, Frown, RefreshCw, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { Sticker } from '@/types';
@@ -13,6 +14,7 @@ export function Feed() {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchFeed = async () => {
     setLoading(true);
@@ -58,6 +60,25 @@ export function Feed() {
   useEffect(() => {
     fetchFeed();
   }, [user]);
+
+  const filteredStickers = useMemo(() => {
+    const query = searchTerm.toLowerCase().trim();
+    if (!query) return stickers;
+
+    return stickers.filter((sticker) => {
+      return [
+        sticker.athlete_name,
+        sticker.team,
+        sticker.position,
+        sticker.description,
+        sticker.status,
+        sticker.rarity,
+        sticker.shirt_number,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [stickers, searchTerm]);
 
   const handleDelete = (id: string) => {
     setStickers(prev => prev.filter(s => s.id !== id));
@@ -116,7 +137,22 @@ export function Feed() {
         </div>
       )}
 
-      {/* Empty State */}
+      {/* Search + Empty States */}
+      {/* Search bar */}
+      {!loading && !error && stickers.length > 0 && (
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Pesquisar por atleta, seleção, posição, número ou descrição..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
       {!loading && !error && stickers.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
           <div className="w-16 h-16 rounded-2xl sticker-gradient flex items-center justify-center">
@@ -137,10 +173,20 @@ export function Feed() {
         </div>
       )}
 
-      {/* Feed */}
-      {!loading && !error && stickers.length > 0 && (
+      {/* Feed results */}
+      {!loading && !error && stickers.length > 0 && filteredStickers.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
+          <Frown className="w-12 h-12 text-muted-foreground" />
+          <div>
+            <p className="font-semibold">Nenhuma figurinha encontrada para sua pesquisa.</p>
+            <p className="text-sm text-muted-foreground mt-1">Tente outro termo ou limpe a busca.</p>
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && filteredStickers.length > 0 && (
         <div className="space-y-4">
-          {stickers.map(sticker => (
+          {filteredStickers.map(sticker => (
             <StickerCard
               key={sticker.id}
               sticker={sticker}

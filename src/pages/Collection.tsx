@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Trophy } from 'lucide-react';
+import { Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { Sticker, StickerStatus, STICKER_STATUSES } from '@/types';
@@ -18,6 +20,7 @@ export function Collection() {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [filter, setFilter] = useState<FilterStatus>(ALL);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchCollection = async () => {
@@ -73,10 +76,29 @@ export function Collection() {
     fetchCollection();
   }, [user]);
 
-  const filtered = useMemo(() => {
+  const filteredByStatus = useMemo(() => {
     if (filter === ALL) return stickers;
     return stickers.filter(sticker => sticker.status === filter);
   }, [stickers, filter]);
+
+  const filtered = useMemo(() => {
+    const query = searchTerm.toLowerCase().trim();
+    if (!query) return filteredByStatus;
+
+    return filteredByStatus.filter((sticker) => {
+      return [
+        sticker.athlete_name,
+        sticker.team,
+        sticker.position,
+        sticker.description,
+        sticker.status,
+        sticker.rarity,
+        sticker.shirt_number,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [filteredByStatus, searchTerm]);
 
   const counts = {
     Todas: stickers.length,
@@ -100,6 +122,18 @@ export function Collection() {
         </Link>
       </div>
 
+      <div className="mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar por atleta, seleção, posição, número ou descrição..."
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
       <Tabs value={filter} onValueChange={value => setFilter(value as FilterStatus)}>
         <TabsList className="grid grid-cols-4 w-full">
           <TabsTrigger value="Todas">Todas ({counts.Todas})</TabsTrigger>
@@ -113,7 +147,7 @@ export function Collection() {
         <div className="space-y-4">
           {[...Array(3)].map((_, index) => <Skeleton key={index} className="h-80 rounded-xl" />)}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : stickers.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center space-y-4">
             <div className="w-16 h-16 rounded-2xl sticker-gradient flex items-center justify-center mx-auto">
@@ -123,6 +157,23 @@ export function Collection() {
               <h2 className="font-semibold text-lg">Nenhuma figurinha encontrada</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 Cadastre uma figurinha ou altere o filtro da coleção.
+              </p>
+            </div>
+            <Link to="/sticker/create">
+              <Button className="cursor-pointer">Cadastrar figurinha</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-16 text-center space-y-4">
+            <div className="w-16 h-16 rounded-2xl sticker-gradient flex items-center justify-center mx-auto">
+              <Trophy className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-lg">Nenhuma figurinha encontrada para sua pesquisa.</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Tente outro termo de busca ou limpe a pesquisa.
               </p>
             </div>
             <Link to="/sticker/create">

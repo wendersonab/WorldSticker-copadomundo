@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Send } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,9 +21,9 @@ export function Chat() {
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async (silent = false) => {
     if (!id || !user) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
 
     try {
       const { data: participant, error: participantError } = await supabase
@@ -50,18 +50,21 @@ export function Chat() {
 
       if (messagesError) throw messagesError;
 
-  setMessages((data ?? []) as Message[]);
+      // update messages; replace state to avoid duplicates — when silent we still
+      // replace but avoid showing loading UI to prevent flicker
+      setMessages((data ?? []) as Message[]);
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
       toast.error('Erro ao carregar conversa. Confira se o SQL atualizado foi executado.');
       navigate('/conversations');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, [id, user, navigate]);
 
   useEffect(() => {
-    fetchMessages();
+  // initial full load (show loading skeleton)
+  fetchMessages();
 
     // Realtime subscription for new messages on this conversation
     let channel: any = null;
@@ -85,8 +88,8 @@ export function Chat() {
               // the joined profile data (avatar, username, full_name).
               // payload.new by itself doesn't include related profiles.
               try {
-                // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                fetchMessages();
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          fetchMessages(true);
               } catch (e) {
                 console.warn('Failed to refetch messages on realtime event', e);
               }
@@ -98,7 +101,7 @@ export function Chat() {
         // If realtime not available, fallback to polling
         console.warn('Realtime subscription failed, falling back to polling', err);
         pollingInterval = setInterval(() => {
-          fetchMessages();
+          fetchMessages(true);
         }, 3000);
       }
     };
@@ -144,8 +147,8 @@ export function Chat() {
       if (error) throw error;
 
   await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', id);
-  // refetch to get the joined profile data for the newly sent message
-  await fetchMessages();
+  // refetch silently to get joined profile data without visual flicker
+  await fetchMessages(true);
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       toast.error('Erro ao enviar mensagem');

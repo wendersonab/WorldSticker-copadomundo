@@ -23,12 +23,51 @@ export function Collection() {
     const fetchCollection = async () => {
       if (!user) return;
       setLoading(true);
-      const { data } = await supabase
-        .from('stickers')
-        .select('*, profiles:user_id(id, username, full_name, avatar_url)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      setStickers((data ?? []) as Sticker[]);
+      try {
+        const { data: stickersData, error } = await supabase
+          .from('stickers')
+          .select('*, profiles:user_id(id, username, full_name, avatar_url)')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const stickersList = (stickersData ?? []) as Sticker[];
+
+        if (stickersList.length === 0) {
+          setStickers([]);
+          return;
+        }
+
+        const stickerIds = stickersList.map(s => s.id);
+
+        // fetch likes and comments counts and whether current user liked
+        const [likesRes, userLikesRes, commentsRes] = await Promise.all([
+          supabase.from('post_likes').select('sticker_id', { count: 'exact' }).in('sticker_id', stickerIds),
+          user ? supabase.from('post_likes').select('sticker_id, user_id').in('sticker_id', stickerIds).eq('user_id', user.id) : Promise.resolve({ data: null }),
+          supabase.from('comments').select('sticker_id', { count: 'exact' }).in('sticker_id', stickerIds),
+        ]);
+
+        const likes = likesRes.data ?? [];
+        const userLikes = (userLikesRes as any).data ?? [];
+        const comments = commentsRes.data ?? [];
+
+        const stickersWithMeta = stickersList.map(s => {
+          const likes_count = likes.filter((l: any) => l.sticker_id === s.id).length || 0;
+          const comments_count = comments.filter((c: any) => c.sticker_id === s.id).length || 0;
+          const user_liked = !!user && userLikes.some((ul: any) => ul.sticker_id === s.id && ul.user_id === user.id);
+          return {
+            ...s,
+            likes_count,
+            comments_count,
+            user_liked,
+          } as Sticker;
+        });
+
+        setStickers(stickersWithMeta);
+      } catch (err) {
+        console.error('Erro ao carregar coleção:', err);
+      }
       setLoading(false);
     };
     fetchCollection();

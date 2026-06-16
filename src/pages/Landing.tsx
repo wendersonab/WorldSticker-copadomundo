@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Trophy, Star, Users, Heart, MessageCircle, Package, Shield, Zap, ChevronRight } from 'lucide-react';
 import logoImg from '@/icone.png';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTheme } from '@/hooks/useTheme';
@@ -46,6 +47,9 @@ function StatusBadge({ status }: { status: string }) {
 
 export function Landing() {
   const { theme, toggleTheme } = useTheme();
+  const { user, loading: authLoading } = useAuth();
+
+  const authenticated = !authLoading && !!user;
 
   return (
     <div className="min-h-screen bg-background">
@@ -96,18 +100,33 @@ export function Landing() {
             encontre as figurinhas que você precisa para completar sua coleção.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/register">
-              <Button size="lg" className="w-full sm:w-auto cursor-pointer text-base px-8">
-                <Star className="mr-2 h-5 w-5" />
-                Criar minha conta grátis
-              </Button>
-            </Link>
-            <Link to="/login">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto cursor-pointer text-base px-8">
-                Já tenho conta
-                <ChevronRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+            {authenticated ? (
+              <>
+                <Button size="lg" className="w-full sm:w-auto cursor-pointer text-base px-8" onClick={() => window.location.assign('/feed')}>
+                  <Star className="mr-2 h-5 w-5" />
+                  Ir para minha coleção
+                </Button>
+                <Button size="lg" variant="outline" className="w-full sm:w-auto cursor-pointer text-base px-8" onClick={() => window.location.assign('/feed')}>
+                  Voltar ao feed
+                  <ChevronRight className="ml-2 h-5 w-5" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link to="/register">
+                  <Button size="lg" className="w-full sm:w-auto cursor-pointer text-base px-8">
+                    <Star className="mr-2 h-5 w-5" />
+                    Criar minha conta grátis
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto cursor-pointer text-base px-8">
+                    Já tenho conta
+                    <ChevronRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -201,11 +220,17 @@ export function Landing() {
               <p className="text-muted-foreground mb-8 text-lg">
                 Junte-se à comunidade WorldSticker e complete sua coleção da Copa do Mundo.
               </p>
-              <Link to="/register">
-                <Button size="lg" className="cursor-pointer text-base px-10">
-                  Começar agora — é grátis
+              {authenticated ? (
+                <Button size="lg" className="cursor-pointer text-base px-10" onClick={() => window.location.assign('/feed')}>
+                  Ir para o feed
                 </Button>
-              </Link>
+              ) : (
+                <Link to="/register">
+                  <Button size="lg" className="cursor-pointer text-base px-10">
+                    Começar agora — é grátis
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>

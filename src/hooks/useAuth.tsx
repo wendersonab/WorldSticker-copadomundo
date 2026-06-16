@@ -48,30 +48,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const session = data?.session ?? null;
+        if (!mounted) return;
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
         }
-        setLoading(false);
+      } catch (err) {
+        console.error('Erro ao obter sessão inicial:', err);
+      } finally {
+        if (mounted) setLoading(false);
       }
-    );
+    })();
 
-    return () => subscription.unsubscribe();
+    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      try {
+        // data may be { subscription } (v2) or a callback unsubscribe (v1)
+        // @ts-ignore
+        if (data?.subscription?.unsubscribe) data.subscription.unsubscribe();
+        // @ts-ignore
+        else if (typeof data?.unsubscribe === 'function') data.unsubscribe();
+      } catch (e) {
+        // ignore
+      }
+    };
   }, []);
 
   const signOut = async () => {
